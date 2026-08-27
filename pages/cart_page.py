@@ -16,6 +16,10 @@ from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 from pages.checkout_page import CheckoutPage
 from pages.helpers import click_until
 
+# 判定「購物車是空的」要等多久。空車時這段時間一定會等好等滿，設太長會拖慢
+# 每一次的後置清空；購物車列表是一支 API 回來就渲染，10 秒綽綽有餘。
+EMPTY_CART_TIMEOUT_MS = 10_000
+
 
 class CartPage:
     PRODUCT_ROW_DELETE = "button.v-product-delete-button"   # 每列商品的「移除」
@@ -34,7 +38,7 @@ class CartPage:
         self.page.locator(self.PRODUCT_ROW_DELETE).first.wait_for(state="visible")
         return self
 
-    def has_items(self, timeout_ms: int = 10_000) -> bool:
+    def has_items(self, timeout_ms: int = EMPTY_CART_TIMEOUT_MS) -> bool:
         """購物車裡有沒有商品。
 
         給清單一段時間渲染，等不到就當作是空的——清空購物車時用得到，
@@ -56,11 +60,13 @@ class CartPage:
         用結帳頁的元素當作「這一步真的換過去了」的訊號，所以這裡會參照
         CheckoutPage 的選擇器——購物車的結帳鈕本來就是通往結帳頁的入口。
         """
-        self._click_and_confirm(self.CHECKOUT_BUTTON, CheckoutPage.BACK_TO_CART, state="visible")
+        self._click_and_confirm(self.CHECKOUT_BUTTON, CheckoutPage.BACK_TO_CART,
+                                state="visible")
 
     def delete_all(self):
         """按「全部刪除」，等到商品列全部消失。"""
-        self._click_and_confirm(self.DELETE_ALL_BUTTON, self.PRODUCT_ROW_DELETE, state="detached")
+        self._click_and_confirm(self.DELETE_ALL_BUTTON, self.PRODUCT_ROW_DELETE,
+                                state="detached")
 
     def _click_and_confirm(self, trigger: str, expected: str, state: str):
         """點擊，並在跳出來的瀏覽器確認視窗按「確定」。

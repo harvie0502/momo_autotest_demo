@@ -3,6 +3,8 @@
 用 Playwright + pytest 針對 [momo 購物網](https://www.momoshop.com.tw/) 的搜尋與購買流程做端對端測試。
 測試跑在**真實的線上網站**上，沒有任何 mock 或 stub。
 
+已在 **macOS** 與 **Windows** 上實際執行通過。
+
 ---
 
 ## 測試情境
@@ -23,49 +25,95 @@
 
 | 項目 | 需求 | 備註 |
 |---|---|---|
-| 作業系統 | macOS / Windows / Linux | 開發與驗證環境為 macOS |
+| 作業系統 | macOS / Windows | 兩者都已實測通過 |
 | Python | 3.9 以上 | 驗證環境為 3.9.6 |
-| Google Chrome | 需要安裝 | 測試預設開本機 Chrome，原因見下方「第一次執行前」 |
-| momo 帳號 | 需要一組可正常登入的帳號 | 測試會真的登入、真的把商品加進購物車 |
+| Google Chrome | 需要安裝 | 測試預設開本機 Chrome，原因見「第一次執行前」 |
+| momo 帳號 | 一組可正常登入的帳號 | 測試會真的登入、真的把商品加進購物車 |
+
+> ⚠️ **後置動作會按下購物車的「全部刪除」**，連同你原本就放在裡面的商品一起清掉。
+> 請使用專門的測試帳號，或先確認購物車裡沒有捨不得的東西。
 
 ---
 
 ## 安裝
 
+### 1. 取得程式
+
 ```bash
 git clone <這個 repo 的網址>
+```
+
+```bash
 cd momo_autotest
 ```
 
-建立虛擬環境並安裝套件：
+### 2. 建立並啟用虛擬環境
+
+**macOS**
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+python3 -m venv .venv && source .venv/bin/activate
 ```
 
-安裝 Playwright 的瀏覽器（作為 Chrome 的備援）：
+**Windows（PowerShell）**
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+> PowerShell 若因執行原則擋下 `Activate.ps1`，先跑一次
+> `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` 再啟用。
+
+**Windows（命令提示字元 cmd）**
+
+```bat
+python -m venv .venv
+.venv\Scripts\activate.bat
+```
+
+啟用成功後，提示字元前面會出現 `(.venv)`。
+
+### 3. 安裝套件
+
+啟用虛擬環境後，兩個平台指令相同：
+
+```bash
+pip install -r requirements.txt
+```
 
 ```bash
 playwright install chromium
 ```
 
+> `playwright install chromium` 是備援用的。測試預設走本機 Chrome，
+> 只有把 `MOMO_BROWSER_CHANNEL` 留空時才會用到內建的 Chromium。
+
 ---
 
 ## 設定帳密
 
-複製範本後填入你自己的 momo 帳號密碼：
+複製範本：
+
+**macOS**
 
 ```bash
 cp .env_example .env
 ```
 
-`.env` 已經在 `.gitignore` 裡，不會進版控。內容：
+**Windows**
+
+```powershell
+Copy-Item .env_example .env
+```
+
+用編輯器打開 `.env` 填入你自己的 momo 帳號密碼。`.env` 已在 `.gitignore` 裡，不會進版控。
 
 | 變數 | 預設 | 說明 |
 |---|---|---|
 | `MOMO_ACCOUNT` | — | momo 帳號（手機 / 身分證字號 / 統一證號 擇一） |
 | `MOMO_PASSWORD` | — | 密碼 |
-| `MOMO_HEADLESS` | `false` | 是否無頭模式。**請保持 false**，原因見「已知限制」 |
+| `MOMO_HEADLESS` | `false` | 是否無頭模式。設 `true` 也跑得起來，但會少一項檢查，見「已知限制」 |
 | `MOMO_BROWSER_CHANNEL` | `chrome` | 用本機 Chrome；留空則改用 Playwright 內建 Chromium |
 | `MOMO_HEADED_PAUSE_SEC` | `3` | 有頭模式下在結帳頁、登出前後各停幾秒方便人眼確認，設 `0` 關閉 |
 
@@ -75,7 +123,7 @@ cp .env_example .env
 
 **這一步只需要做一次，但不做的話測試會登入失敗。**
 
-momo 對沒看過的裝置會要求簡訊 OTP 驗證。這個驗證記錄是存在 momo 的伺服器上，
+momo 對沒看過的裝置會要求簡訊 OTP 驗證。這個驗證記錄存在 momo 的伺服器上，
 綁「帳號 + 瀏覽器身分」，不是存在瀏覽器的 cookie 裡。所以：
 
 1. **用你自己的 Chrome 打開 <https://www.momoshop.com.tw/>**
@@ -85,14 +133,19 @@ momo 對沒看過的裝置會要求簡訊 OTP 驗證。這個驗證記錄是存�
 完成之後，自動化測試開的也是**同一個 Chrome**（`MOMO_BROWSER_CHANNEL=chrome`），
 對 momo 來說是同一台裝置，就不會再要求簡訊驗證了。
 
-> 為什麼一定要 Chrome？Playwright 內建的 Chromium 和 Firefox 的瀏覽器身分都不一樣，
+> **為什麼一定要 Chrome？**
+> Playwright 內建的 Chromium 和 Firefox，瀏覽器身分都跟 Chrome 不一樣，
 > 對 momo 來說是沒驗證過的新裝置，會再次要求簡訊 OTP。
-> 框架也把無頭模式的 User-Agent 從 `HeadlessChrome` 改回 `Chrome`（見 `conftest.py`
-> 的 `stable_user_agent`），讓有頭 / 無頭跑起來是同一個身分。
+> 框架也把無頭模式的 User-Agent 從 `HeadlessChrome` 改回 `Chrome`
+> （見 `conftest.py` 的 `stable_user_agent`），讓有頭 / 無頭跑起來是同一個身分。
 
 ---
 
 ## 執行測試
+
+兩個平台指令相同（虛擬環境要先啟用）。
+
+跑全部：
 
 ```bash
 pytest
@@ -104,20 +157,68 @@ pytest
 pytest -k test_buy_from_cart
 ```
 
-失敗時想看得更清楚（截圖 / 錄影 / trace）：
+用無頭模式跑（少一項檢查，見「已知限制」）：
+
+**macOS**
 
 ```bash
-pytest --screenshot=only-on-failure --video=retain-on-failure --tracing=retain-on-failure
+MOMO_HEADLESS=true pytest
 ```
 
-產出會放在 `test-results/`。用 `playwright show-trace test-results/<資料夾>/trace.zip` 開啟 trace。
+**Windows（PowerShell）**
+
+```powershell
+$env:MOMO_HEADLESS="true"; pytest
+```
+
+> 命令列給的環境變數會蓋過 `.env` 裡的值（`load_dotenv` 預設不覆寫既有變數），
+> 所以臨時切換模式不用改檔案。
+
+### 測試報告
+
+**不需要加任何參數**，每次執行都會在 `test-results/report.html` 產出一份測試報告，
+是自足的單一 HTML 檔（`--self-contained-html`），樣式內嵌，直接用瀏覽器打開即可。
+
+要換產出目錄：
+
+```bash
+pytest --output=my-results
+```
+
+> **為什麼不用 pytest-playwright 內建的 `--screenshot` / `--video` / `--tracing`？**
+> 那些功能掛在它自己的 `context` fixture 上（透過 `new_context()` 註冊 recorder）。
+> 本框架為了「整包只登入一次」把 `context` 覆寫成 session scope、直接向 browser 要，
+> 繞過了那個工廠，所以內建參數在這裡**完全不會生效**。失敗時請看 terminal 的斷言
+> 訊息——每個斷言都帶著實際值。`--device`、`--base-url` 這些走
+> `browser_context_args` 的參數則照常生效。
+
+### 真站測試偶爾會抖
+
+被站方限流或網路不穩時，可以讓失敗的測試自動重跑：
+
+```bash
+pytest --reruns 1 --reruns-delay 5
+```
+
+預設**不啟用**。自動重跑會把「偶爾失敗」和「穩定通過」混成同一個綠燈，
+要不要接受這個代價應該是每次執行時的決定，不該寫死在設定檔裡。
+
+### 常見問題
+
+| 症狀 | 原因與處理 |
+|---|---|
+| `command not found: pytest`（或 `pytest 不是內部或外部命令`） | 虛擬環境沒啟用。回到「建立並啟用虛擬環境」，確認提示字元前有 `(.venv)` |
+| 登入失敗，訊息含 `ACT016` 或要求簡訊驗證 | 沒做「第一次執行前」那一步，或 `MOMO_BROWSER_CHANNEL` 不是 `chrome` |
+| 關鍵字建議一直等不到（有頭模式） | momo 的建議 API 有限流，短時間內反覆搜尋會被擋。隔一下再跑 |
+| 提示「請先複製 .env_example 成 .env」 | `.env` 不存在或帳密沒填 |
 
 ---
 
 ## 專案結構
 
 ```
-conftest.py                  瀏覽器設定 + 整包測試「登入一次、登出一次」
+conftest.py                  瀏覽器設定、登入一次登出一次、測試報告
+settings.py                  從 .env 讀進來的執行設定，conftest 與測試共用
 pytest.ini                   pytest 設定
 requirements.txt
 .env_example                 帳密與執行選項的範本
@@ -210,10 +311,18 @@ momo 有替不少元素標上 `data-testid`（`header-login-button`、`header-se
 
 自動化之後，第一次執行就不需要人工介入，也才能真正放進 CI 排程跑。
 
-### 無頭模式不能用
+### 無頭模式會少一項檢查
 
 momo 的 WAF 會擋掉無頭瀏覽器打搜尋建議 API（預檢直接回 403），關鍵字建議清單出不來。
-實測：有頭 15 筆建議、無頭 0 筆。所以 `MOMO_HEADLESS` 預設 `false`，**這也讓測試目前無法在無頭的 CI 環境執行**。
+實測：有頭 15 筆建議、無頭 0 筆。
+
+那是被站方擋掉，不是功能有問題，硬檢查只會得到一個誤報。所以 `MOMO_HEADLESS=true` 時
+會**跳過「輸入時檢查關鍵字建議」這一項**，其餘步驟與斷言全部照常執行
+（9 個斷言中跳過 2 個，兩者屬於同一項檢查），無頭模式已實測通過。
+預設仍是有頭模式，以取得完整的測試涵蓋範圍。
+
+後續若要在無頭 CI 跑完整涵蓋範圍，需要能讓測試流量通過 WAF
+（例如測試環境放行、或改用內部可用的搜尋建議端點）。
 
 ### 測試會動到真實帳號
 

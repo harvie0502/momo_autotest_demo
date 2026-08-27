@@ -4,6 +4,12 @@ from playwright.sync_api import Page
 
 from pages.urls import HOME_URL, SEARCH_URL_PATTERN
 
+# 逐字輸入時每個字之間隔多久（毫秒）。
+# 這不是「等頁面反應」的 sleep，而是模擬打字速度：momo 的建議 API 有做輸入節流，
+# 一口氣把字塞完就只會觸發最後一次請求，中途的建議清單根本不會出現。
+# 120ms 大約是一般人打中文的速度，實測能穩定拿到建議清單。
+TYPING_DELAY_MS = 120
+
 
 class HomePage:
     SEARCH_INPUT = '[data-testid="header-search-input"]'
@@ -29,7 +35,7 @@ class HomePage:
         """
         search_input = self.page.locator(self.SEARCH_INPUT)
         search_input.click()
-        search_input.press_sequentially(keyword, delay=120)
+        search_input.press_sequentially(keyword, delay=TYPING_DELAY_MS)
         return self
 
     def get_suggestions(self) -> list:
@@ -40,7 +46,11 @@ class HomePage:
         self.page.locator(self.SUGGESTION_PANEL).wait_for(state="visible")
         items = self.page.locator(self.SUGGESTION_ITEM)
         items.first.wait_for(state="visible")
-        return [t.strip().splitlines()[0].strip() for t in items.all_inner_texts() if t.strip()]
+        return [
+            text.strip().splitlines()[0].strip()
+            for text in items.all_inner_texts()
+            if text.strip()
+        ]
 
     def submit_search(self):
         """送出搜尋。

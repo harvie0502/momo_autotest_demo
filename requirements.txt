@@ -1,4 +1,8 @@
 playwright==1.55.0
 pytest==8.3.5
 pytest-playwright==0.7.0
+pytest-html==4.1.1
 python-dotenv==1.0.1
+# 真站測試偶爾會被站方限流或網路抖動絆到。預設不啟用（測試語意不該被
+# 自動重跑掩蓋），需要時用 pytest --reruns 1 --reruns-delay 5 開。
+pytest-rerunfailures==15.0

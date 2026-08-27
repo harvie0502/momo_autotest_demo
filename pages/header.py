@@ -14,7 +14,9 @@ import re
 
 from playwright.sync_api import Page, expect
 
+from pages.helpers import DEFAULT_TIMEOUT_MS
 from pages.urls import CART_URL_PATTERN
+
 
 class Header:
     CART_ENTRY = "#TopCart"
@@ -33,9 +35,14 @@ class Header:
 
         加入購物車是非同步的，這個數字就是使用者眼中「加成功了」的訊號，
         等它更新再往下走，比等一個固定秒數可靠。
+
+        逾時明寫是刻意的。conftest 的 pytest_configure 已經把 expect() 的全域
+        預設從 5 秒拉到 30 秒，所以這裡不寫也會是 30 秒；但 Page Object 的行為
+        不該取決於「有沒有透過 pytest 跑」，寫死才能單獨拿出來用也一樣可靠。
         """
         expect(self.page.locator(self.CART_ENTRY)).to_have_text(
-            re.compile(rf"購物車\s*\(\s*{expected}\s*\)")
+            re.compile(rf"購物車\s*\(\s*{expected}\s*\)"),
+            timeout=DEFAULT_TIMEOUT_MS,
         )
 
     def open_cart(self):

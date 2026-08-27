@@ -8,10 +8,16 @@ header 上那顆按鈕登入前後是同一個元素，只是 data-testid 會換
 所以「有沒有登入」直接看這顆按鈕現在是哪一個就好。
 """
 
-from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import (
+    Error as PlaywrightError,
+    Page,
+    TimeoutError as PlaywrightTimeoutError,
+)
 
 from pages.helpers import click_until
 from pages.urls import HOME_URL
+
+LOGIN_TIMEOUT_MS = 60_000
 
 
 class LoginPage:
@@ -37,7 +43,8 @@ class LoginPage:
 
         # 登入成功後 header 那顆按鈕會變成「登出」，這是使用者看得到的訊號
         try:
-            self.page.locator(self.LOGOUT_ENTRY).wait_for(state="visible", timeout=60_000)
+            self.page.locator(self.LOGOUT_ENTRY).wait_for(
+                state="visible", timeout=LOGIN_TIMEOUT_MS)
         except PlaywrightTimeoutError:
             raise AssertionError(
                 f"登入失敗，header 沒有變成「登出」。站方訊息：{self._error_message() or '（無）'}"
@@ -48,8 +55,18 @@ class LoginPage:
         click_until(self.page, self.LOGOUT_ENTRY, self.LOGIN_ENTRY)
 
     def _error_message(self) -> str:
-        hint = self.page.frame_locator(self.LOGIN_IFRAME).locator(self.ERROR_HINT)
-        return hint.first.inner_text().strip() if hint.count() else ""
+        """讀登入視窗裡的錯誤提示；讀不到就回空字串。
+
+        這個方法只在登入已經失敗之後被呼叫，任務是「讓錯誤訊息更好懂」。
+        如果登入其實已經導頁、iframe 不在了，frame_locator 這串會自己拋錯——
+        那會把上面那句「登入失敗，header 沒有變成登出」換成一個看不懂的
+        frame 錯誤，等於用診斷程式碼蓋掉了真正的診斷結果。所以一律吞掉。
+        """
+        try:
+            hint = self.page.frame_locator(self.LOGIN_IFRAME).locator(self.ERROR_HINT)
+            return hint.first.inner_text().strip() if hint.count() else ""
+        except PlaywrightError:
+            return ""
 
 
 def is_logged_in(page: Page) -> bool:
