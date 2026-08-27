@@ -44,7 +44,7 @@ git clone <這個 repo 的網址>
 ```
 
 ```bash
-cd momo_autotest
+cd momo_autotest_demo
 ```
 
 ### 2. 建立並啟用虛擬環境
@@ -72,11 +72,35 @@ python -m venv .venv
 .venv\Scripts\activate.bat
 ```
 
+**Windows（Git Bash / MINGW64）**
+
+```bash
+python -m venv .venv
+```
+
+```bash
+source .venv/Scripts/activate
+```
+
+> Git Bash 用的是 **`/` 斜線**與**沒有副檔名的 `activate`**，而且前面要加 `source`。
+> 直接照抄 cmd 的 `.venv\Scripts\activate.bat` 會失敗——bash 把反斜線當跳脫字元，
+> 路徑會被拆成 `.venvScriptsactivate.bat`，得到 `command not found`；
+> `.bat` 本身也只有 cmd.exe 能執行。
+
 啟用成功後，提示字元前面會出現 `(.venv)`。
+
+**離開虛擬環境**（四種 shell 都一樣）：
+
+```bash
+deactivate
+```
+
+這只會還原目前這個 shell 的環境變數，**不會**刪掉 `.venv`，下次再啟用即可。
+直接關掉終端機也等於離開。
 
 ### 3. 安裝套件
 
-啟用虛擬環境後，兩個平台指令相同：
+啟用虛擬環境後，各平台指令相同：
 
 ```bash
 pip install -r requirements.txt
@@ -101,11 +125,26 @@ playwright install chromium
 cp .env_example .env
 ```
 
-**Windows**
+**Windows（PowerShell）**
 
 ```powershell
 Copy-Item .env_example .env
 ```
+
+**Windows（命令提示字元 cmd）**
+
+```bat
+copy .env_example .env
+```
+
+**Windows（Git Bash / MINGW64）**
+
+```bash
+cp .env_example .env
+```
+
+> `Copy-Item` 是 PowerShell 專有的 cmdlet，在 cmd.exe 裡執行會得到
+> 「`'Copy-Item' 不是內部或外部命令`」。cmd 請用 `copy`，Git Bash 請用 `cp`。
 
 用編輯器打開 `.env` 填入你自己的 momo 帳號密碼。`.env` 已在 `.gitignore` 裡，不會進版控。
 
@@ -143,7 +182,7 @@ momo 對沒看過的裝置會要求簡訊 OTP 驗證。這個驗證記錄存在 
 
 ## 執行測試
 
-兩個平台指令相同（虛擬環境要先啟用）。
+各平台指令相同（虛擬環境要先啟用）。
 
 跑全部：
 
@@ -208,9 +247,12 @@ pytest --reruns 1 --reruns-delay 5
 | 症狀 | 原因與處理 |
 |---|---|
 | `command not found: pytest`（或 `pytest 不是內部或外部命令`） | 虛擬環境沒啟用。回到「建立並啟用虛擬環境」，確認提示字元前有 `(.venv)` |
+| `pytest: error: unrecognized arguments: --self-contained-html` | 虛擬環境裡少了 `pytest-html`。在啟用狀態下重跑 `pip install -r requirements.txt` |
+| `bash: .venvScriptsactivate.bat: command not found` | 在 Git Bash 裡用了 cmd 的反斜線寫法。改用 `source .venv/Scripts/activate` |
 | 登入失敗，訊息含 `ACT016` 或要求簡訊驗證 | 沒做「第一次執行前」那一步，或 `MOMO_BROWSER_CHANNEL` 不是 `chrome` |
 | 關鍵字建議一直等不到（有頭模式） | momo 的建議 API 有限流，短時間內反覆搜尋會被擋。隔一下再跑 |
 | 提示「請先複製 .env_example 成 .env」 | `.env` 不存在或帳密沒填 |
+| `'Copy-Item' 不是內部或外部命令` | 在 cmd.exe 裡用了 PowerShell 的 cmdlet。cmd 用 `copy`，Git Bash 用 `cp` |
 
 ---
 
@@ -265,8 +307,6 @@ tests/
 | `locator.wait_for(state=...)` | 元素出現 / 消失 |
 | `page.wait_for_url(...)` | 導頁到指定頁面 |
 | `expect(...).to_have_text(...)` | 文字變成預期值 |
-
-唯一的固定停頓是 `MOMO_HEADED_PAUSE_SEC`，那是給人眼看畫面用的，只在有頭模式生效。
 
 ### 選擇器優先順序
 
