@@ -4,3 +4,4 @@ __pycache__/
 .pytest_cache/
 test-results/
 .DS_Store
+# 用 pytest --output=<其他目錄> 換產出位置時，記得把那個目錄也加進來

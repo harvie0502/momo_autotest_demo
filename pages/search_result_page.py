@@ -8,14 +8,18 @@
         <div class="btnArea"><a class="addToCart">     <- 卡片上的購物車鈕
         <h3 class="prdName"><a class="prdName">...     <- 商品名稱
 
-點卡片上的購物車鈕不會直接加入，會先跳出「請選擇商品規格」的視窗，
+點卡片上的購物車鈕，需要選規格的商品會先跳出「請選擇商品規格」的視窗，
 在那裡再按一次「加入購物車」才真的加進去。
 """
 
-from playwright.sync_api import Page
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
 
 from pages.helpers import choose_first_spec
 from pages.urls import PRODUCT_URL_PATTERN
+
+# 等規格視窗跳出來的時間。這裡刻意不用 30 秒的預設值：沒有規格要選的商品
+# 根本不會有視窗，用預設值等於每碰到一件就白等 30 秒才往下走。
+SPEC_DIALOG_TIMEOUT_MS = 8_000
 
 
 class SearchResultPage:
@@ -25,7 +29,10 @@ class SearchResultPage:
     ADD_TO_CART_BUTTON = "a.addToCart"
 
     SPEC_DIALOG = "div.prdTypeArea-box"          # 請選擇商品規格
-    SPEC_DROPDOWN = "select"                     # 視窗裡的 select 全是規格
+    # 選擇器是相對於規格視窗解析的，視窗裡目前只有規格用的 select，
+    # 所以這裡用得起裸 select。商品頁沒有這層框，那邊得自己排除數量與
+    # 推薦商品的下拉選單，寫法因此不同（見 product_page.py 的 SPEC_DROPDOWN）。
+    SPEC_DROPDOWN = "select"
     SPEC_BUTTON = "button.f2e-spec-button"       # 按鈕方塊式的規格
     SPEC_CONFIRM_BUTTON = "a.enterBtn"           # 視窗裡的「加入購物車」
 
@@ -65,9 +72,9 @@ class SearchResultPage:
     def add_first_product_to_cart(self):
         """把第一項商品加入購物車。
 
-        加入是非同步的，這裡只等規格視窗關閉（代表送出了）。
-        「真的加進去了」要看 header 的購物車數字，由呼叫端用
-        Header.wait_for_cart_count() 確認。
+        加入是非同步的，這裡只負責把該按的都按完。「真的加進去了」要看 header
+        的購物車數字，由呼叫端用 Header.wait_for_cart_count() 確認——
+        所以下面規格視窗沒出現時可以安心往下走，不會漏掉失敗。
         """
         card = self.first_card()
         card.scroll_into_view_if_needed()
@@ -76,7 +83,13 @@ class SearchResultPage:
         card.locator(self.ADD_TO_CART_BUTTON).first.click()
 
         dialog = self.page.locator(self.SPEC_DIALOG)
-        dialog.wait_for(state="visible")
+        try:
+            dialog.wait_for(state="visible", timeout=SPEC_DIALOG_TIMEOUT_MS)
+        except PlaywrightTimeoutError:
+            # 沒有規格要選的商品會直接加入，不跳視窗。這不是錯誤，
+            # 是不是真的加進去了留給 wait_for_cart_count() 判定。
+            return
+
         choose_first_spec(dialog.locator(self.SPEC_DROPDOWN),
                           dialog.locator(self.SPEC_BUTTON))
         dialog.locator(self.SPEC_CONFIRM_BUTTON).click()

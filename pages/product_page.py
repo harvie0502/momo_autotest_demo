@@ -11,7 +11,11 @@
 
 import re
 
-from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import (
+    Error as PlaywrightError,
+    Page,
+    TimeoutError as PlaywrightTimeoutError,
+)
 
 from pages.helpers import choose_first_spec
 from pages.urls import CART_URL_PATTERN
@@ -72,5 +76,15 @@ class ProductPage:
             )
 
     def _dialog_message(self) -> str:
-        dialog = self.page.locator(self.MESSAGE_DIALOG)
-        return dialog.first.inner_text().strip() if dialog.count() else ""
+        """讀 momo 擋下操作時跳的提示；讀不到就回空字串。
+
+        跟 LoginPage._error_message() 同樣的道理：這個方法只在 buy_now() 已經
+        失敗之後被呼叫，任務是「讓錯誤訊息更好懂」。頁面如果已經導走或關掉，
+        這串會自己拋錯，把上面那句寫得清清楚楚的 AssertionError 換成一個
+        看不懂的 TargetClosedError——用診斷程式碼蓋掉診斷結果。所以一律吞掉。
+        """
+        try:
+            dialog = self.page.locator(self.MESSAGE_DIALOG)
+            return dialog.first.inner_text().strip() if dialog.count() else ""
+        except PlaywrightError:
+            return ""
