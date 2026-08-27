@@ -36,19 +36,20 @@ def config():
 
 
 @pytest.fixture(scope="session")
-def browser_channel(browser_channel):
-    """用本機安裝的 Chrome，而不是 Playwright 內建的 Chromium。
-
-    momo 的裝置認證記在他們 server 上，綁「帳號 + 瀏覽器身分」。使用者平常是用
-    自己的 Chrome 手動登入並完成簡訊驗證的，測試也開同一個 Chrome，才算同一台
-    裝置、不會再被要求驗證。用 --browser-channel 或 MOMO_BROWSER_CHANNEL 可覆寫。
-    """
-    return browser_channel or BROWSER_CHANNEL or None
-
-
-@pytest.fixture(scope="session")
 def browser_type_launch_args(browser_type_launch_args):
+    """瀏覽器啟動參數。
+
+    channel 一定要塞進這裡才有作用：pytest-playwright 啟動瀏覽器時只讀
+    browser_type_launch_args，覆寫 browser_channel fixture 是沒有效果的。
+    命令列的 --browser-channel 優先，這裡只在沒指定時補上預設值。
+    """
     args = dict(browser_type_launch_args)
+    if BROWSER_CHANNEL and "channel" not in args:
+        # 用本機安裝的 Chrome，而不是 Playwright 內建的 Chromium。
+        # momo 的裝置認證記在他們 server 上，綁「帳號 + 瀏覽器身分」；
+        # 使用者是用自己的 Chrome 手動完成簡訊驗證的，測試也開同一個 Chrome，
+        # 才算同一台裝置、不會再被要求驗證。
+        args["channel"] = BROWSER_CHANNEL
     args["args"] = [
         *args.get("args", []),
         "--start-maximized",
